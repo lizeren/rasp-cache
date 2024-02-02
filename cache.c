@@ -24,7 +24,9 @@ int main() {
     // printf("Freq of cntvct is: %lld\n",freq);
     // printf("cntvct_el0 is: %lld\n",temp_disp1);
 
-    uint8_t array[256 * 8192];
+
+
+    uint8_t array[256 * 4096];
     volatile uint8_t *volatile_array = array; // Declare a volatile pointer to the array
     int temp, temp2, i;
     int64_t fast_diff1, fast_diff2;
@@ -32,19 +34,15 @@ int main() {
 
     // Initialize the array
     for (i = 0; i < 256; i++) {
-        volatile_array[i * 8192] = 1;
+        volatile_array[i * 4096] = 1;
         asm volatile ("dsb ish"); // Data synchronization barrier ensure write has completed
     }
-    
-    // Access some of the array items
-    volatile_array[7 * 8192] = 200;
-
 
     // Timestamp and array access with serialization and data barriers
     asm volatile ("isb"); // Serialize before reading the counter
     asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff1));
     asm volatile ("isb"); // Serialize after reading the counter
-    temp2 = volatile_array[7 * 8192];
+    temp2 = volatile_array[7 * 4096];
     asm volatile ("dsb ish"); // Data synchronization barrier after volatile access
     asm volatile ("isb"); // Serialize before reading the counter again
     asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff2));
@@ -55,26 +53,66 @@ int main() {
 
 
     // FLUSH the array from the CPU cache
+    // for (i = 0; i < 256; i++) {
+    //     asm volatile ("dc civac, %0" : : "r" (&volatile_array[i * 4096]) : "memory");
+    //     //asm volatile ("dsb ish"); // Data synchronization barrier ensure invalidation has completed
+    //     asm volatile ("isb"); // Insert isb for serialization after cache flush
+    // }
     for (i = 0; i < 256; i++) {
-        asm volatile ("dc civac, %0" : : "r" (&volatile_array[i * 8192]) : "memory");
+        asm volatile ("dc civac, %0" : : "r" (&volatile_array[i * 4096]) : "memory");
         //asm volatile ("dsb ish"); // Data synchronization barrier ensure invalidation has completed
         asm volatile ("isb"); // Insert isb for serialization after cache flush
     }
+
  
 
     // Similar pattern for the second measurement
     asm volatile ("isb");
     asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
     asm volatile ("isb");
-    temp = volatile_array[1 * 8192];
+    temp = volatile_array[7 * 4096];
     asm volatile ("dsb ish");
     asm volatile ("isb");
     asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
     asm volatile ("isb");
     int64_t second_diff = (slow_diff2 - slow_diff1);
 
+    temp = volatile_array[10 * 4096];
     printf("fast diff %" PRId64 "\n",first_diff);
     printf("slow diff %" PRId64 "\n",second_diff);
+
+    // Similar pattern for the second measurement
+    asm volatile ("isb");
+    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
+    asm volatile ("isb");
+    temp = volatile_array[8 * 4096];
+    asm volatile ("dsb ish");
+    asm volatile ("isb");
+    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
+    asm volatile ("isb");
+    printf("what about access 8: %" PRId64 "\n",slow_diff2 - slow_diff1);
+
+    // Similar pattern for the second measurement
+    asm volatile ("isb");
+    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
+    asm volatile ("isb");
+    temp = volatile_array[9 * 4096];
+    asm volatile ("dsb ish");
+    asm volatile ("isb");
+    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
+    asm volatile ("isb");
+    printf("what about access 9: %" PRId64 "\n",slow_diff2 - slow_diff1);
+
+    asm volatile ("isb");
+    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
+    asm volatile ("isb");
+    temp = volatile_array[10 * 4096];
+    asm volatile ("dsb ish");
+    asm volatile ("isb");
+    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
+    asm volatile ("isb");
+    printf("what about access 10: %" PRId64 "\n",slow_diff2 - slow_diff1);
+
 
     // asm volatile("MRS %0, cntvct_el0 " : "=r" (temp_disp2));
     // asm volatile ("isb"); // Serialize after reading the counter
