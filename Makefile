@@ -2,11 +2,11 @@
 CC=gcc
 
 # Define any compile-time flags
-CFLAGS=-O3 
+CFLAGS=-O0 
 
 # Define the source file(s)
-SRC=cache.c
-#SRC=spectre.c
+# SRC=cache.c
+SRC=spectre.c
 
 # Define the target executable
 TARGET=execute

