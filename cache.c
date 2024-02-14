@@ -20,7 +20,7 @@ static inline uint64_t read_pmccntr(void)
 int main() {
     
 
-    uint8_t array[256 * 4096];
+    uint8_t array[256 * 128];
     volatile uint8_t *volatile_array = array; // Declare a volatile pointer to the array
     int temp, temp2, i;
     int64_t fast_diff1, fast_diff2;
@@ -28,7 +28,7 @@ int main() {
 
     // Initialize the array
     for (i = 0; i < 256; i++) {
-        volatile_array[i * 4096] = 1;
+        volatile_array[i * 128] = 1;
         asm volatile ("dsb ish"); // Data synchronization barrier ensure write has completed
     }
 
@@ -37,7 +37,7 @@ int main() {
     fast_diff1 = read_pmccntr();
     //asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff1));
     asm volatile ("isb"); // Serialize after reading the counter
-    temp2 = volatile_array[7 * 4096];
+    temp2 = volatile_array[7 * 128];
     asm volatile ("dsb ish"); // Data synchronization barrier after volatile access
     asm volatile ("isb"); // Serialize before reading the counter again
     // asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff2));
@@ -51,7 +51,7 @@ int main() {
     // FLUSH the array from the CPU cache
 
     for (i = 0; i < 256; i++) {
-        asm volatile ("dc civac, %0" : : "r" (&volatile_array[i * 4096]) : "memory");
+        asm volatile ("dc civac, %0" : : "r" (&volatile_array[i * 128]) : "memory");
         //asm volatile ("dsb ish"); // Data synchronization barrier ensure invalidation has completed
         asm volatile ("isb"); // Insert isb for serialization after cache flush
     }
@@ -63,7 +63,7 @@ int main() {
     // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
     slow_diff1 = read_pmccntr();
     asm volatile ("isb");
-    temp = volatile_array[7 * 4096];
+    temp = volatile_array[7 * 128];
     asm volatile ("dsb ish");
     asm volatile ("isb");
     //asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
@@ -71,7 +71,7 @@ int main() {
     asm volatile ("isb");
     int64_t second_diff = (slow_diff2 - slow_diff1);
 
-    temp = volatile_array[10 * 4096];
+    temp = volatile_array[10 * 128];
     printf("fast diff %" PRId64 "\n",first_diff);
     printf("slow diff %" PRId64 "\n",second_diff);
 
@@ -80,7 +80,7 @@ int main() {
     //asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
     slow_diff1 = read_pmccntr();
     asm volatile ("isb");
-    temp = volatile_array[80 * 4096];
+    temp = volatile_array[80 * 128];
     asm volatile ("dsb ish");
     asm volatile ("isb");
     //asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
@@ -93,7 +93,7 @@ int main() {
     asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
     slow_diff1 = read_pmccntr();
     asm volatile ("isb");
-    temp = volatile_array[119 * 4096];
+    temp = volatile_array[119 * 128];
     asm volatile ("dsb ish");
     asm volatile ("isb");
     // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
@@ -105,7 +105,7 @@ int main() {
     // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
     slow_diff1 = read_pmccntr();
     asm volatile ("isb");
-    temp = volatile_array[10 * 4096];
+    temp = volatile_array[10 * 128];
     asm volatile ("dsb ish");
     asm volatile ("isb");
     // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
@@ -113,7 +113,7 @@ int main() {
     asm volatile ("isb");
     printf("what about access 10, which has beed accessed before: %" PRId64 "\n",slow_diff2 - slow_diff1);
 
-    asm volatile ("dc civac, %0" : : "r" (&volatile_array[10 * 4096]) : "memory");
+    asm volatile ("dc civac, %0" : : "r" (&volatile_array[10 * 128]) : "memory");
     //asm volatile ("dsb ish"); // Data synchronization barrier ensure invalidation has completed
     asm volatile ("isb"); // Insert isb for serialization after cache flush
 
@@ -121,7 +121,7 @@ int main() {
     asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
     slow_diff1 = read_pmccntr();
     asm volatile ("isb");
-    temp = volatile_array[10 * 4096];
+    temp = volatile_array[10 * 128];
     asm volatile ("dsb ish");
     asm volatile ("isb");
     // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
