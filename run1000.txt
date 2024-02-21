@@ -1,0 +1,1 @@
+gcc -o txt2excel txt2excel.c && ./txt2excel

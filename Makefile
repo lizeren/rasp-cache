@@ -2,13 +2,13 @@
 CC=gcc
 
 # Define any compile-time flags
-CFLAGS=-O3
+CFLAGS=-O0
 
 # Define the source file(s)
 # SRC=cache.c
 SRC = FlushReload.c
 # SRC=spectre.c
-
+# SRC = hit_time.c
 # Define the target executable
 TARGET=execute
 
