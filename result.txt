@@ -1,5 +1,12 @@
-array[72*256 + 64] is in cache.
-The Secret = 72.
-hit time is 127
-
+Top TOP_N elements with the highest values:
+Index: 10, Value: 1
+Index: 11, Value: 1
+Index: 12, Value: 1
+Index: 18, Value: 1
+Index: 4, Value: 0
+Index: 5, Value: 0
+Index: 6, Value: 0
+Index: 7, Value: 0
+Index: 8, Value: 0
+Index: 9, Value: 0
 [0;34mExecution complete[0m 
