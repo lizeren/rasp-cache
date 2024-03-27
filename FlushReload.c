@@ -6,8 +6,8 @@
 #define stride (256)
 #define TOP_N (10)
 uint8_t array[256 * stride];
-volatile uint8_t temp;
-unsigned char secret = 18;
+volatile uint8_t temp, temp2;
+unsigned char secret = 30;
 /* cache hit time threshold assumed*/
 #define CACHE_HIT_THRESHOLD (130)
 #define DELTA 64
@@ -61,10 +61,6 @@ static inline uint64_t read_pmccntr(void)
   asm volatile("mrs %0, pmccntr_el0" : "=r"(val));
   return val;
 }
-void victim()
-{
-  temp = array[secret * stride + DELTA];
-}
 void flushSideChannel()
 {
   int i;
@@ -76,6 +72,32 @@ void flushSideChannel()
     asm volatile("isb");
   }
 }
+void victim()
+{
+  // temp = array[secret * stride + DELTA]; //30
+  // temp = array[(secret + 20) * stride + DELTA]; //50
+  // temp = array[(secret + 40) * stride + DELTA]; //70
+  // temp = array[(secret + 60) * stride + DELTA]; //90
+  // temp = array[(secret + 80) * stride + DELTA]; //110
+  // temp = array[(secret + 100) * stride + DELTA]; //130
+
+  // temp = array[(secret) * stride + DELTA];//30
+  // temp = array[(secret+1) * stride + DELTA];//31
+  // temp = array[(secret+2) * stride + DELTA];//32
+  // temp = array[(secret+3) * stride + DELTA];//33
+  // temp = array[(secret+4) * stride + DELTA];//34
+  // temp = array[(secret+5) * stride + DELTA];//35
+
+  temp = array[(secret) * stride + DELTA];//30
+  temp = array[(secret+2) * stride + DELTA];//32
+  temp = array[(secret+4) * stride + DELTA];//34
+  temp = array[(secret+6) * stride + DELTA];//36
+  temp = array[(secret+8) * stride + DELTA];//38
+  temp = array[(secret+10) * stride + DELTA];//40
+
+
+}
+ 
 
 void reloadSideChannel()
 {
@@ -100,10 +122,10 @@ void reloadSideChannel()
     // printf("~~~~~At mix_i = %d~~~~~\ntime_diff: %d\n\n", mix_i, time_diff);
     if (time_diff <= CACHE_HIT_THRESHOLD)
     {
-      // printf("array[%d*%d + %d] is in cache.\n", mix_i, stride, DELTA);
-      // printf("The Secret = %d.\n", mix_i);
-      // printf("hit time is %d\n", time_diff);
-      // printf("\n");
+      printf("array[%d*%d + %d] is in cache.\n", mix_i, stride, DELTA);
+      printf("The Secret = %d.\n", mix_i);
+      printf("hit time is %d\n", time_diff);
+      printf("\n");
       ascii_hit_counter[mix_i] += 1;
     }
 
@@ -133,7 +155,7 @@ int main(int argc, const char **argv)
 
   }
 
-  for (i = 0; i < 1; i++)
+  for (i = 0; i < 10; i++)
   {
     flushSideChannel();
     victim();
@@ -149,10 +171,10 @@ int main(int argc, const char **argv)
   quickSort(pairs, 0, 256 - 1);
 
   // Print the top TOP_N elements
-  printf("Top TOP_N elements with the highest values:\n");
+  printf("Top %d elements with the highest hits:\n",TOP_N);
   for (int i = 0; i < TOP_N; i++)
   {
-    printf("Index: %d, Value: %d\n", pairs[i].index, pairs[i].value);
+    printf("Index: %d, hits: %d\n", pairs[i].index, pairs[i].value);
   }
 
   return (0);

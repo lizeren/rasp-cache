@@ -35,16 +35,16 @@ int main() {
 
     // Timestamp and array access with serialization and data barriers
     asm volatile ("isb"); // Serialize before reading the counter
-    // fast_diff1 = read_pmccntr();
-    asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff1));
+    fast_diff1 = read_pmccntr();
+    // asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff1));
     asm volatile ("isb"); // Serialize after reading the counter
 
     temp2 = volatile_array[7 * 64];
     asm volatile ("dsb ish"); // Data synchronization barrier after volatile access
     
     asm volatile ("isb"); // Serialize before reading the counter again
-    asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff2));
-    //fast_diff2 = read_pmccntr();
+    // asm volatile ("MRS %0, cntvct_el0" : "=r" (fast_diff2));
+    fast_diff2 = read_pmccntr();
     asm volatile ("isb"); // Serialize after reading the counter
     int64_t first_diff = (fast_diff2 - fast_diff1);
 
@@ -65,16 +65,16 @@ int main() {
 
     // Similar pattern for the second measurement
     asm volatile ("isb");
-    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
-    // slow_diff1 = read_pmccntr();
+    // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff1));
+    slow_diff1 = read_pmccntr();
     asm volatile ("isb");
 
     temp = volatile_array[7 * 256];
     asm volatile ("dsb ish");
 
     asm volatile ("isb");
-    asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
-    // slow_diff2 = read_pmccntr();
+    // asm volatile ("MRS %0, cntvct_el0" : "=r" (slow_diff2));
+    slow_diff2 = read_pmccntr();
     asm volatile ("isb");
     int64_t second_diff = (slow_diff2 - slow_diff1);
 
