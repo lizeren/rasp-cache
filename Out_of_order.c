@@ -44,27 +44,29 @@ static inline uint64_t read_pmccntr(void)
 int main() {
 
     int i;
-    register uint64_t time1, time2, time_diff;
+    register uint64_t time1, time2, time3, time4, time_diff;
     int temp;
-    location = 100;
-
     for(i = 0;i < array1_size * 10; i++){
         array1[i] = i;
     }
 
     //~~~~~~~~~~~~~~~~~~~~~~~hit time measure~~~~~~~~~~~~~~~~~
     asm volatile("isb"); // Serialize before reading the counter
-    //asm volatile("MRS %0, cntvct_el0" : "=r"(time1));
     time1 = read_pmccntr();
     asm volatile("isb"); // Serialize after reading the counter
     temp = array1[array1_size * 10];
     asm volatile("isb"); // Serialize before reading the counter
-    //asm volatile("MRS %0, cntvct_el0" : "=r"(time2));
     time2 = read_pmccntr();
     asm volatile("isb"); // Serialize after reading the counter
     time_diff = time2 - time1;
     printf("hit time is %ld \n",time_diff);
 
+    //flush array1 from cache
+    for(i = 0;i < array1_size * 10; i++){
+        asm volatile("dc civac, %0" : : "r"(&array1[i]) : "memory");
+        asm volatile("dsb ish"); // Data synchronization barrier ensure write has completed
+        asm volatile("isb"); // Insert isb for serialization after cache flush
+    }
 
     for(i = 0;i < 256 * stride + DELTA; i++){
         array2[i] = i;
@@ -76,16 +78,12 @@ int main() {
         asm volatile("dsb ish"); // Data synchronization barrier ensure write has completed
         asm volatile("isb"); // Insert isb for serialization after cache flush
     }
-
-
-     //~~~~~~~~~~~~~~~~~~~~~~~miss time measure~~~~~~~~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~~~~~~~miss time measure~~~~~~~~~~~~~~~~~
     asm volatile("isb"); // Serialize before reading the counter
-    //asm volatile("MRS %0, cntvct_el0" : "=r"(time1));
     time1 = read_pmccntr();
     asm volatile("isb"); // Serialize after reading the counter
     temp = array2[1];
     asm volatile("isb"); // Serialize before reading the counter
-    //asm volatile("MRS %0, cntvct_el0" : "=r"(time2));
     time2 = read_pmccntr();
     asm volatile("isb"); // Serialize after reading the counter
     time_diff = time2 - time1;
@@ -93,27 +91,41 @@ int main() {
 
 
 
-
-  
-
-    //train branch predictor
-    for (i = 5;i < 10; i++){
-        victim_function(i);
-    }
-
-    asm volatile("dc civac, %0" : : "r"(&location) : "memory");
+    int a = 1;
+    int b = 2;
+    int c = 3;
+    asm volatile("dc civac, %0" : : "r"(&a) : "memory");
+    asm volatile("dsb ish"); // Data synchronization barrier ensure write has completed
+    asm volatile("isb"); // Insert isb for serialization after cache flush
+    asm volatile("dc civac, %0" : : "r"(&b) : "memory");
+    asm volatile("dsb ish"); // Data synchronization barrier ensure write has completed
+    asm volatile("isb"); // Insert isb for serialization after cache flush
+    asm volatile("dc civac, %0" : : "r"(&c) : "memory");
     asm volatile("dsb ish"); // Data synchronization barrier ensure write has completed
     asm volatile("isb"); // Insert isb for serialization after cache flush
 
-    victim_function(location);
-    asm volatile("isb"); 
-    time1 = read_pmccntr();
-    asm volatile("isb"); 
-    temp = array2[location * stride + DELTA];
-    asm volatile("isb"); 
-    time2 = read_pmccntr();
-    asm volatile("isb"); 
-    time_diff = time2 - time1;
-    printf("access time of speculation is %ld \n",time_diff);
+    if(a + b == c){
+        asm volatile("isb"); // Serialize before reading the counter
+        time1 = read_pmccntr();
+        asm volatile("isb"); // Serialize after reading the counter
+        temp = array1[array1_size * 10];
+        asm volatile("isb"); // Serialize before reading the counter
+        time2 = read_pmccntr();
+        asm volatile("isb"); // Serialize after reading the counter
+    }
+    temp = array1[array1_size * 10];
+
+    asm volatile("isb"); // Serialize before reading the counter
+    time3 = read_pmccntr();
+    asm volatile("isb"); // Serialize after reading the counter
+    temp = array1[array1_size];
+    asm volatile("isb"); // Serialize before reading the counter
+    time4 = read_pmccntr();
+    asm volatile("isb"); // Serialize after reading the counter
+
+
+    printf("Time 2 - Time 1 is %ld \n", time2 - time1);
+    printf("Time 4 - Time 3 is %ld \n", time4 - time3);
+
 
 }
