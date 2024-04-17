@@ -10,8 +10,13 @@ CFLAGS=-O0
 # SRC = FlushReload.c
 # SRC=spectre.c
 # SRC = hit_time.c
-SRC=speculation.c
-# SRC=Out_of_order.c
+# SRC=speculation.c
+SRC=Out_of_order.c
+
+
+#dump asm
+#gcc -S -fverbose-asm -O0 Out_of_order.c
+
 
 
 # Define the target executable
